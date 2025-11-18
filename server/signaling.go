@@ -36,21 +36,21 @@ type broadcastMsg struct {
 
 var broadcast = make(chan broadcastMsg)
 
-func broadcaster() {
-	for {
-		msg := <-broadcast
-		for _, client := range AllRooms.Map[msg.RoomID] {
-			if client.Conn != msg.Client {
-				err := client.Conn.WriteJSON(msg.Message)
-
-				if err != nil {
-					log.Fatal(err)
-					client.Conn.Close()
+func Broadcaster() {
+	go func() {
+		for {
+			msg := <-broadcast
+			for _, client := range AllRooms.Map[msg.RoomID] {
+				if client.Conn != msg.Client {
+					err := client.Conn.WriteJSON(msg.Message)
+					if err != nil {
+						log.Println("failed to WriteJSON: ", err)
+						client.Conn.Close()
+					}
 				}
-
 			}
 		}
-	}
+	}()
 }
 
 func JoinRoomRequestHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,20 +68,17 @@ func JoinRoomRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	AllRooms.InsertIntoRoom(roomID[0], false, ws)
 
-	go broadcaster()
-
 	for {
 		var msg broadcastMsg
 
 		err := ws.ReadJSON(&msg.Message)
 		if err != nil {
-			log.Fatal("Read Error:", err)
+			log.Println("Read Error:", err)
+			return
 		}
 
 		msg.Client = ws
 		msg.RoomID = roomID[0]
-
-		log.Println(msg.Message)
 
 		broadcast <- msg
 

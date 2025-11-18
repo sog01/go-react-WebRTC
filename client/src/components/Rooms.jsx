@@ -1,5 +1,6 @@
-import {useEffect, useRef} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {useLocation} from "react-router-dom";
+import VideoPlayer from './Videoplayer';
 
 const Room = () => {
     const location = useLocation();
@@ -8,30 +9,92 @@ const Room = () => {
     const partnerVideo = useRef();
     const peerRef = useRef();
     const webSocketRef = useRef();
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [currentUserStream, setCurrentUserStream] = useState(null); // State to trigger re-render
+    const screenStream = useRef();
     
 
     const openCamera = async () => {
         const constraints = {
             video: true,
             audio: true,
-
         };
-        navigator.mediaDevices.getUserMedia(constraints).then((stream) =>{
+        return navigator.mediaDevices.getUserMedia(constraints).then((stream) =>{
             userVideo.current.srcObject = stream
             userStream.current = stream
+            setCurrentUserStream(stream)
         })
     };
+
+    const handleScreenShare = async (shouldShare) => {
+        try {
+            if (shouldShare) {
+                // Start screen sharing
+                const screenStreamData = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+                
+                screenStream.current = screenStreamData;
+                
+                // Replace video track in peer connection
+                if (peerRef.current) {
+                    const videoTrack = screenStreamData.getVideoTracks()[0];
+                    const sender = peerRef.current.getSenders().find(s => s.track?.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(videoTrack);
+                    }
+                }
+                
+                // Update local video
+                userVideo.current.srcObject = screenStreamData;
+                
+                // Handle screen share stop
+                screenStreamData.getVideoTracks()[0].onended = () => {
+                    handleScreenShare(false);
+                };
+                
+                setIsScreenSharing(true);
+            } else {
+                // Stop screen sharing and return to camera
+                if (screenStream.current) {
+                    screenStream.current.getTracks().forEach(track => track.stop());
+                }
+                
+                // Replace with camera track
+                if (peerRef.current && userStream.current) {
+                    const videoTrack = userStream.current.getVideoTracks()[0];
+                    const sender = peerRef.current.getSenders().find(s => s.track?.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(videoTrack);
+                    }
+                }
+                
+                // Restore camera video
+                userVideo.current.srcObject = userStream.current;
+                setIsScreenSharing(false);
+            }
+        } catch (err) {
+            console.error('Screen sharing error:', err);
+            setIsScreenSharing(false);
+        }
+    };
+
+    const hasInitialized = useRef(false);
     useEffect(() => {
+        if (hasInitialized.current) return;
+        hasInitialized.current = true;
+
         openCamera().then( async() => {
             const roomID = location.pathname.split("/");
             webSocketRef.current = new WebSocket(`ws://localhost:8000/join?roomID=${roomID[2]}`)
 
             
-           await webSocketRef.current.addEventListener("open", () => {
+           webSocketRef.current.addEventListener("open", () => {
                 webSocketRef.current.send(JSON.stringify({ join: true }));
             });
 
-            await webSocketRef.current.addEventListener("message", async (e) => {
+           webSocketRef.current.addEventListener("message", async (e) => {
                 const message = JSON.parse(e.data);
 
                 if (message.join) {
@@ -58,26 +121,24 @@ const Room = () => {
                    }catch(err) {
                         console.log("error ICE CANDIDADE")
                    }
-                    
-                    
                 }
-                
             })
-    
         })
-    });
+    }, []);
 
     const handleOffer = async (offer) => {
-        console.log("Received Offer, Creating Answer");
+        console.log("Handle Offer");
         peerRef.current = createPeer();
-
         await peerRef.current.setRemoteDescription(
             new RTCSessionDescription(offer)
         );
 
-        await userStream.current.getTracks().forEach((track) => {
-            peerRef.current.addTrack(track, userStream.current);
-        });
+        if (userStream.current) {
+            console.log('send current tracks')
+            await userStream.current.getTracks().forEach((track) => {
+                peerRef.current.addTrack(track, userStream.current);
+            });
+        }
 
         const answer = await peerRef.current.createAnswer();
         await peerRef.current.setLocalDescription(answer);
@@ -140,33 +201,54 @@ const Room = () => {
 
     
   return (
-    <div>
+    <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#1a1a1a',
+        padding: '20px'
+    }}>
+        {/* Header */}
         <div style={{
              display : "flex",
              justifyContent : "center",
              alignItems : "center",
              color:"whitesmoke",
-             height:"200px",
-             width: "100%",
+             marginBottom: '30px'
             }}>
             <h1>
-                Golang {"&"} React
+                Meets Me
             </h1>
         </div>
 
+        {/* Video Grid */}
         <div style={{
-            display : "flex",
-            justifyContent : "center",
-            alignItems : "center",
-            top: "100px",
-            right: "100px",
-            borderRadius: "10px",
-            overflow: "hidden",
+            display: 'flex',
+            gap: '20px',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            maxWidth: '1400px',
+            margin: '0 auto'
+        }}>
+            {/* Partner Video (Main) */}
+            <VideoPlayer 
+                videoRef={partnerVideo}
+                isLocalUser={false}
+            />
+
+            {/* User Video (Small) */}
+            <div style={{
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                zIndex: 10
             }}>
-
-            <video playsInline  autoPlay muted controls={true} ref={userVideo} />
-            <video playsInline autoPlay controls={true} ref={partnerVideo}/>
-
+                <VideoPlayer 
+                    videoRef={userVideo}
+                    isLocalUser={true}
+                    stream={currentUserStream}
+                    onToggleScreenShare={handleScreenShare}
+                />
+            </div>
         </div>
     </div>
   )

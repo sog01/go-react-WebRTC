@@ -9,6 +9,7 @@ import (
 
 func main() {
 	server.AllRooms.Init()
+	server.Broadcaster()
 
 	http.HandleFunc("/create", server.CreateRoomRequestHandler)
 	http.HandleFunc("/join", server.JoinRoomRequestHandler)
