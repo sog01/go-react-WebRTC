@@ -87,7 +87,7 @@ const Room = () => {
 
         openCamera().then( async() => {
             const roomID = location.pathname.split("/");
-            webSocketRef.current = new WebSocket(`ws://meetsmi.com/api/join?roomID=${roomID[2]}`)
+            webSocketRef.current = new WebSocket(`wss://meetsmi.com/api/join?roomID=${roomID[2]}`)
 
             
            webSocketRef.current.addEventListener("open", () => {
