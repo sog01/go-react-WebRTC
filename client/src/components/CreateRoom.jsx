@@ -8,7 +8,7 @@ const CreateRoom = () => {
     const create = async (e) => {
         e.preventDefault()
 
-        const resp = await fetch("http://localhost:8000/create")
+        const resp = await fetch("https://meetsmi.com/api/create")
         const { room_id } = await resp.json();
 
         navigate(`/room/${room_id}`, { state: { id: room_id}})
