@@ -160,7 +160,16 @@ const Room = () => {
     const createPeer = () => {
         console.log("Creating Peer Connection");
         const peer = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+            iceServers: [
+                { 
+                    urls: "stun:stun.l.google.com:19302" 
+                }, 
+                {
+                    urls: "turn:openrelay.metered.ca:80",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                }
+            ],
         });
 
         peer.onnegotiationneeded = handleNegotiationNeeded;
@@ -186,7 +195,17 @@ const Room = () => {
     const handleIceCandidateEvent = async (e) => {
         console.log("Found Ice Candidate");
         if (e.candidate) {
-            console.log(e.candidate);
+            const type = e.candidate.type;
+        
+            if (type === 'host') {
+                console.log('🏠 HOST candidate (local IP):', e.candidate.address);
+            } else if (type === 'srflx') {
+                console.log('🌐 SRFLX candidate (STUN - public IP):', e.candidate.address);
+            } else if (type === 'relay') {
+                console.log('🔄 RELAY candidate (TURN server) - SUCCESS!:', e.candidate.address);
+            } else {
+                console.log('❓ Unknown type:', type);
+            }
             await webSocketRef.current.send(
                 JSON.stringify({ iceCandidate: e.candidate })
             );
