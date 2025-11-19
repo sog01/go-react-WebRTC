@@ -161,13 +161,11 @@ const Room = () => {
         console.log("Creating Peer Connection");
         const peer = new RTCPeerConnection({
             iceServers: [
+                { urls: "stun:stun.l.google.com:19302" }, 
                 { 
-                    urls: "stun:stun.l.google.com:19302" 
-                }, 
-                {
-                    urls: "turn:openrelay.metered.ca:80",
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
+                    urls: 'turn:meetsmi.com:3478',
+                    username: 'meetuser',
+                    credential: 'b6679d9b-1619-4fb1-af78-8c755c9d8f14'
                 }
             ],
         });
