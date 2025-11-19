@@ -161,15 +161,17 @@ const Room = () => {
         console.log("Creating Peer Connection");
         const peer = new RTCPeerConnection({
             iceServers: [
-                { urls: "stun:stun.l.google.com:19302" }, 
+                { 
+                    urls: 'stun:meetsmi.com:3478'
+                },
                 { 
                     urls: 'turn:meetsmi.com:3478',
                     username: 'meetuser',
-                    credential: 'b6679d9b-1619-4fb1-af78-8c755c9d8f14'
+                    credential: 'b6679d9b-1619-4fb1-af78-8c755c9d8f15'
                 }
             ],
         });
-
+        console.log('Applied config:', peer.getConfiguration().iceServers);
         peer.onnegotiationneeded = handleNegotiationNeeded;
         peer.onicecandidate = handleIceCandidateEvent;
         peer.ontrack = handleTrackEvent;
